@@ -27,20 +27,61 @@ const ADS_URL =
   console.log("Page title:", await page.title());
   console.log("Current URL:", page.url());
 
+  // Scroll to load more ads
+  console.log("Scrolling to load more ads...");
+
+  for (let i = 0; i < 8; i++) {
+    await page.evaluate(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "instant"
+      });
+    });
+
+    await page.waitForTimeout(3000);
+
+    console.log(`Scroll ${i + 1}/8 completed`);
+  }
+
+  console.log("Collecting images...");
+
   const images = await page.locator("img").evaluateAll(imgs =>
     imgs
-      .map(img => img.src)
-      .filter(src => src && src.startsWith("http"))
+      .map(img => ({
+        src: img.src,
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      }))
+      .filter(img =>
+        img.src &&
+        img.src.startsWith("http") &&
+        img.width >= 300 &&
+        img.height >= 300
+      )
   );
 
-  const uniqueImages = [...new Set(images)];
+  // Remove duplicate URLs
+  const uniqueImages = [];
+  const seen = new Set();
 
-  console.log("Images found:", uniqueImages.length);
+  for (const image of images) {
+    if (!seen.has(image.src)) {
+      seen.add(image.src);
+      uniqueImages.push(image);
+    }
+  }
 
-  uniqueImages.slice(0, 20).forEach((url, i) => {
-    console.log(`IMAGE ${i + 1}: ${url}`);
+  console.log("================================");
+  console.log("Large images found:", uniqueImages.length);
+  console.log("================================");
+
+  uniqueImages.forEach((image, i) => {
+    console.log(
+      `IMAGE ${i + 1} | ${image.width}x${image.height} | ${image.src}`
+    );
   });
 
+  // Save screenshot for inspection
   await page.screenshot({
     path: "facebook-ads-library.png",
     fullPage: false
@@ -48,5 +89,7 @@ const ADS_URL =
 
   await browser.close();
 
+  console.log("================================");
   console.log("Test completed.");
+  console.log("================================");
 })();
