@@ -25,7 +25,21 @@ const ADS_URL =
   await page.waitForTimeout(10000);
 
   console.log("Page title:", await page.title());
-  console.log("URL:", page.url());
+  console.log("Current URL:", page.url());
+
+  const images = await page.locator("img").evaluateAll(imgs =>
+    imgs
+      .map(img => img.src)
+      .filter(src => src && src.startsWith("http"))
+  );
+
+  const uniqueImages = [...new Set(images)];
+
+  console.log("Images found:", uniqueImages.length);
+
+  uniqueImages.slice(0, 20).forEach((url, i) => {
+    console.log(`IMAGE ${i + 1}: ${url}`);
+  });
 
   await page.screenshot({
     path: "facebook-ads-library.png",
