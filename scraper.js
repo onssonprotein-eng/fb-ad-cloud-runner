@@ -1,4 +1,6 @@
 const { chromium } = require("playwright");
+const fs = require("fs");
+const path = require("path");
 
 const ADS_URL =
   "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=MY&is_targeted_country=false&media_type=all&search_type=page&sort_data[direction]=desc&sort_data[mode]=total_impressions&view_all_page_id=296717127062813";
@@ -27,7 +29,6 @@ const ADS_URL =
   console.log("Page title:", await page.title());
   console.log("Current URL:", page.url());
 
-  // Scroll to load more ads
   console.log("Scrolling to load more ads...");
 
   for (let i = 0; i < 8; i++) {
@@ -60,7 +61,6 @@ const ADS_URL =
       )
   );
 
-  // Remove duplicate URLs
   const uniqueImages = [];
   const seen = new Set();
 
@@ -72,16 +72,72 @@ const ADS_URL =
   }
 
   console.log("================================");
-  console.log("Large images found:", uniqueImages.length);
+  console.log("Images to download:", uniqueImages.length);
   console.log("================================");
 
-  uniqueImages.forEach((image, i) => {
-    console.log(
-      `IMAGE ${i + 1} | ${image.width}x${image.height} | ${image.src}`
-    );
-  });
+  const outputDir = path.join(process.cwd(), "images");
 
-  // Save screenshot for inspection
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  let downloaded = 0;
+  let failed = 0;
+
+  for (let i = 0; i < uniqueImages.length; i++) {
+    const image = uniqueImages[i];
+
+    try {
+      const response = await page.request.get(image.src, {
+        timeout: 30000
+      });
+
+      if (!response.ok()) {
+        throw new Error(`HTTP ${response.status()}`);
+      }
+
+      const buffer = await response.body();
+
+      const contentType =
+        response.headers()["content-type"] || "";
+
+      let extension = ".jpg";
+
+      if (contentType.includes("png")) {
+        extension = ".png";
+      } else if (contentType.includes("webp")) {
+        extension = ".webp";
+      } else if (contentType.includes("gif")) {
+        extension = ".gif";
+      }
+
+      const filename =
+        `ad-${String(i + 1).padStart(3, "0")}${extension}`;
+
+      const filepath = path.join(outputDir, filename);
+
+      fs.writeFileSync(filepath, buffer);
+
+      downloaded++;
+
+      console.log(
+        `DOWNLOADED ${downloaded}: ${filename} | ${image.width}x${image.height}`
+      );
+
+    } catch (error) {
+      failed++;
+
+      console.log(
+        `FAILED ${i + 1}: ${error.message}`
+      );
+    }
+  }
+
+  console.log("================================");
+  console.log(`Downloaded: ${downloaded}`);
+  console.log(`Failed: ${failed}`);
+  console.log("================================");
+
   await page.screenshot({
     path: "facebook-ads-library.png",
     fullPage: false
@@ -89,7 +145,5 @@ const ADS_URL =
 
   await browser.close();
 
-  console.log("================================");
   console.log("Test completed.");
-  console.log("================================");
 })();
